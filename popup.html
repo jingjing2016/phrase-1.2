@@ -53,6 +53,18 @@
     <div id="promptStatus" style="margin-top: 5px; font-size: 0.9em;"></div>
   </div>
 
+  <div id="responseProcessingSection" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+    <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 1em;">Response Processing</h3>
+    <div>
+      <input type="checkbox" id="enableFilteringToggle" style="margin-right: 5px; vertical-align: middle;">
+      <label for="enableFilteringToggle" style="display: inline; margin-top: 0;">Enable filtering of thought process</label>
+    </div>
+    <label for="filterStartSymbol">Start Symbol:</label>
+    <input type="text" id="filterStartSymbol" placeholder="e.g., <think>">
+    <label for="filterEndSymbol">End Symbol:</label>
+    <input type="text" id="filterEndSymbol" placeholder="e.g., </think>">
+  </div>
+
   <button id="save">Save Settings</button>
   <div id="status"></div>
   <button id="testApiButton" style="margin-top: 5px;">Test API Configuration</button>

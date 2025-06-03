@@ -33,6 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetPromptButton = document.getElementById('resetPromptButton');
   const promptStatusDiv = document.getElementById('promptStatus');
 
+  // Response Processing elements
+  const enableFilteringToggle = document.getElementById('enableFilteringToggle');
+  const filterStartSymbolInput = document.getElementById('filterStartSymbol');
+  const filterEndSymbolInput = document.getElementById('filterEndSymbol');
+
   // Data variables
   let currentModelPresets = ["", "", "", "", ""];
   let selectedModelPresetIndex = 0;
@@ -49,7 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Loading Data ---
   function loadData() {
-    chrome.storage.local.get(['apiEndpoint', 'apiKey', 'modelPresets', 'selectedModelPresetIndex', 'customPromptTemplate'], (result) => {
+    chrome.storage.local.get([
+      'apiEndpoint', 'apiKey', 'modelPresets', 'selectedModelPresetIndex', 'customPromptTemplate',
+      'enableFiltering', 'filterStartSymbol', 'filterEndSymbol' // Added new keys
+    ], (result) => {
       if (result.apiEndpoint) apiEndpointInput.value = result.apiEndpoint;
       if (result.apiKey) apiKeyInput.value = result.apiKey;
 
@@ -77,6 +85,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // This ensures background.js always has a valid prompt from storage after first run
         chrome.storage.local.set({ customPromptTemplate: DEFAULT_PROMPT_TEMPLATE });
       }
+
+      // Load filtering settings
+      enableFilteringToggle.checked = typeof result.enableFiltering === 'boolean' ? result.enableFiltering : false;
+      filterStartSymbolInput.value = typeof result.filterStartSymbol === 'string' ? result.filterStartSymbol : "<think>";
+      filterEndSymbolInput.value = typeof result.filterEndSymbol === 'string' ? result.filterEndSymbol : "</think>";
+
+      // If defaults were applied because settings weren't in storage, save them back.
+      // This ensures that if the user opens and saves other settings, these defaults are also persisted.
+      // However, this might be better handled by explicitly saving them only if they were truly absent,
+      // or just letting the main save button handle all saves. For now, we'll ensure defaults are in the UI fields
+      // and the main save button will pick them up.
+      if (typeof result.enableFiltering === 'undefined') {
+        chrome.storage.local.set({ enableFiltering: false });
+      }
+      if (typeof result.filterStartSymbol === 'undefined') {
+        chrome.storage.local.set({ filterStartSymbol: "<think>" });
+      }
+      if (typeof result.filterEndSymbol === 'undefined') {
+        chrome.storage.local.set({ filterEndSymbol: "</think>" });
+      }
     });
   }
 
@@ -84,15 +112,28 @@ document.addEventListener('DOMContentLoaded', () => {
   saveSettingsButton.addEventListener('click', () => {
     const endpoint = apiEndpointInput.value.trim();
     const key = apiKeyInput.value.trim();
+    const enableFiltering = enableFilteringToggle.checked;
+    const filterStartSymbol = filterStartSymbolInput.value.trim();
+    const filterEndSymbol = filterEndSymbolInput.value.trim();
 
     if (!endpoint || !key) {
       statusDiv.textContent = 'Error: API Endpoint and Key are required.';
       statusDiv.style.color = 'red';
       return;
     }
-    // Model name is now handled by preset selection, not direct input on this page.
-    chrome.storage.local.set({ apiEndpoint: endpoint, apiKey: key }, () => {
-      statusDiv.textContent = 'API Settings saved!';
+
+    const settingsToSave = {
+      apiEndpoint: endpoint,
+      apiKey: key,
+      enableFiltering: enableFiltering,
+      filterStartSymbol: filterStartSymbol,
+      filterEndSymbol: filterEndSymbol
+      // modelPresets and selectedModelPresetIndex are saved separately
+      // customPromptTemplate is saved separately
+    };
+
+    chrome.storage.local.set(settingsToSave, () => {
+      statusDiv.textContent = 'Settings saved!'; // General message
       statusDiv.style.color = 'green';
       setTimeout(() => { statusDiv.textContent = ''; }, 1500);
     });

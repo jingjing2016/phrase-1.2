@@ -4,7 +4,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "analyzeText") {
     const textToAnalyze = request.text;
 
-    chrome.storage.local.get(['apiEndpoint', 'apiKey', 'modelPresets', 'selectedModelPresetIndex', 'customPromptTemplate'], (config) => {
+    chrome.storage.local.get(
+      ['apiEndpoint', 'apiKey', 'modelPresets', 'selectedModelPresetIndex', 'customPromptTemplate', 'enableFiltering', 'filterStartSymbol', 'filterEndSymbol'],
+      (config) => {
       if (!config.apiEndpoint || !config.apiKey) {
         console.error('API endpoint or key not configured.');
         sendResponse({ error: "API not configured. Please set it in the extension popup." });
@@ -62,7 +64,60 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })
       .then(data => {
         if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
-          sendResponse({ analysis: data.choices[0].message.content });
+          let analysisContent = data.choices[0].message.content;
+
+          // Default filtering values if not present in config (though popup.js should set them)
+          const enableFiltering = typeof config.enableFiltering === 'boolean' ? config.enableFiltering : false;
+          const filterStartSymbol = typeof config.filterStartSymbol === 'string' && config.filterStartSymbol.trim() !== '' ? config.filterStartSymbol : "<think>";
+          const filterEndSymbol = typeof config.filterEndSymbol === 'string' && config.filterEndSymbol.trim() !== '' ? config.filterEndSymbol : "</think>";
+
+          if (enableFiltering && filterStartSymbol && filterEndSymbol) {
+            // More robust filtering logic to handle non-nested occurrences
+            let currentText = analysisContent;
+            let resultText = "";
+            let pointer = 0;
+
+            while (true) {
+              let startIndex = currentText.indexOf(filterStartSymbol, pointer);
+              if (startIndex === -1) { // No more start symbols
+                resultText += currentText.substring(pointer); // Add the rest of the string
+                break;
+              }
+              // Add text before the start symbol
+              resultText += currentText.substring(pointer, startIndex);
+
+              let endIndex = currentText.indexOf(filterEndSymbol, startIndex + filterStartSymbol.length);
+              if (endIndex === -1) { // No end symbol found after a start symbol
+                // Append the rest of the string, including the unmatched startSymbol, to avoid data loss
+                // or to indicate an issue with tagging in the LLM response.
+                // Depending on desired behavior, one might choose to discard from startIndex or include it.
+                // For now, let's assume we want to stop processing and append the remainder if an end tag is missing.
+                // Or, a stricter approach: resultText += currentText.substring(startIndex);
+                // For this implementation, we will consider the part from start_index as not to be filtered if no end_index is found.
+                // So, we'll just append from the start_index and break.
+                // However, the provided snippet implies removing the start tag even if no end tag, so we'll adjust pointer and continue.
+                // The prompt's snippet logic: pointer = endIndex + endTag.length;
+                // If endIndex is -1, this will cause an issue.
+                // A safer approach for the snippet: if endIndex == -1, break or handle the dangling start tag.
+                // The snippet from the prompt:
+                // processedText = processedText.substring(0, startIndex) + processedText.substring(endIndex + config.filterEndSymbol.length);
+                // startIndex = processedText.indexOf(config.filterStartSymbol);
+                // This implies if endIndex is -1, it would error.
+                // The new snippet from prompt is:
+                // let endIndex = currentText.indexOf(endTag, startIndex + startTag.length);
+                // if (endIndex === -1) { resultText += currentText.substring(startIndex); break; }
+                // pointer = endIndex + endTag.length;
+                // This is safer.
+                console.warn("Filtering: Start symbol found without a matching end symbol. Text from that point onwards might be unfiltered or partially filtered.");
+                resultText += currentText.substring(startIndex); // Append the rest, including the unmatched start tag.
+                break;
+              }
+              // Move pointer past the filtered section
+              pointer = endIndex + filterEndSymbol.length;
+            }
+            analysisContent = resultText;
+          }
+          sendResponse({ analysis: analysisContent });
         } else {
           console.error('Unexpected API response structure for analysis:', data);
           sendResponse({ error: "Failed to parse analysis from API response." });
