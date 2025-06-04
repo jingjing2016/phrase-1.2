@@ -1,9 +1,17 @@
 let lastHoveredElement = null;
 let analysisDisplayIdCounter = 0; // To give unique IDs to analysis divs if needed
+let lastMouseX = 0;
+let lastMouseY = 0;
 
 // Track the element currently under the mouse
 document.addEventListener('mouseover', (event) => {
   lastHoveredElement = event.target;
+});
+
+// Track mouse position continuously
+document.addEventListener('mousemove', (event) => {
+  lastMouseX = event.clientX;
+  lastMouseY = event.clientY;
 });
 
 // Listen for the hotkey
@@ -209,10 +217,9 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     let identifiedWordText = null;
     let anchorElementForBar = null;
-    const cursorX = event.clientX;
-    const cursorY = event.clientY;
+    // cursorX and cursorY are removed, we'll use lastMouseX and lastMouseY
 
-    const wordInfo = getWordUnderCursor(event);
+    const wordInfo = getWordUnderCursor(event); // This still uses event.clientX/Y internally
 
     if (wordInfo && wordInfo.word) {
       identifiedWordText = wordInfo.word;
@@ -227,10 +234,10 @@ document.addEventListener('keydown', (event) => {
       }
     }
 
-    console.log('Alt+Z pressed. Mouse X:', cursorX, 'Mouse Y:', cursorY);
+    console.log('Alt+Z pressed. Mouse X:', lastMouseX, 'Mouse Y:', lastMouseY);
 
     if (identifiedWordText && anchorElementForBar) {
-      showActionBar(anchorElementForBar, identifiedWordText, cursorX, cursorY);
+      showActionBar(anchorElementForBar, identifiedWordText, lastMouseX, lastMouseY);
     } else {
       console.log("Alt+Z pressed, but no text content or anchor element could be determined.");
       removeExistingActionBar();
