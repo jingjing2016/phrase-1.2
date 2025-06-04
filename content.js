@@ -227,6 +227,8 @@ document.addEventListener('keydown', (event) => {
       }
     }
 
+    console.log('Alt+Z pressed. Mouse X:', cursorX, 'Mouse Y:', cursorY);
+
     if (identifiedWordText && anchorElementForBar) {
       showActionBar(anchorElementForBar, identifiedWordText, cursorX, cursorY);
     } else {
