@@ -7,9 +7,172 @@ document.addEventListener('mouseover', (event) => {
 });
 
 // Listen for the hotkey
+let currentActionBar = null; // Global variable for the action bar
+
+function removeExistingActionBar() {
+  if (currentActionBar) {
+    currentActionBar.remove();
+    currentActionBar = null;
+  }
+}
+
+function showActionBar(anchorElement, identifiedWordText) {
+  removeExistingActionBar(); // Remove any existing bar first
+
+  const actionBar = document.createElement('div');
+  actionBar.style.position = 'absolute';
+  actionBar.style.backgroundColor = '#f0f0f0';
+  actionBar.style.border = '1px solid #ccc';
+  actionBar.style.padding = '5px';
+  actionBar.style.borderRadius = '3px';
+  actionBar.style.zIndex = '10000';
+  actionBar.style.display = 'flex';
+  actionBar.style.gap = '5px';
+
+  for (let i = 0; i < 6; i++) {
+    const button = document.createElement('button');
+    button.textContent = (i + 1).toString();
+    button.dataset.promptIndex = i.toString();
+    button.style.padding = '2px 5px';
+    button.style.fontSize = '12px';
+    button.onclick = () => {
+      const promptIndex = parseInt(button.dataset.promptIndex, 10);
+      // identifiedWordText and anchorElement are available from the showActionBar scope
+
+      // First, set the active prompt index
+      chrome.runtime.sendMessage(
+        { action: "setActivePromptIndex", index: promptIndex },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error setting active prompt index:", chrome.runtime.lastError.message);
+            displayAnalysis(anchorElement, `Error setting active prompt: ${chrome.runtime.lastError.message}`, true);
+            removeExistingActionBar();
+            return;
+          }
+          if (response && response.success) {
+            // Index set successfully, now analyze the text
+            chrome.runtime.sendMessage(
+              { action: "analyzeText", text: identifiedWordText },
+              (analysisResponse) => {
+                if (chrome.runtime.lastError) {
+                  console.error("Error analyzing text:", chrome.runtime.lastError.message);
+                  displayAnalysis(anchorElement, `Error analyzing text: ${chrome.runtime.lastError.message}`, true);
+                  removeExistingActionBar();
+                  return;
+                }
+                if (analysisResponse) {
+                  if (analysisResponse.error) {
+                    console.error("Error from background script (analyzeText):", analysisResponse.error);
+                    displayAnalysis(anchorElement, `Error: ${analysisResponse.error}`, true);
+                  } else if (analysisResponse.analysis) {
+                    displayAnalysis(anchorElement, analysisResponse.analysis, false);
+                  }
+                } else {
+                  console.error("No response from background script (analyzeText) or response was undefined.");
+                  displayAnalysis(anchorElement, "Error: No response from analysis service.", true);
+                }
+                removeExistingActionBar(); // Remove bar after analysis attempt
+              }
+            );
+          } else {
+            // Failed to set prompt index
+            console.error("Failed to set active prompt index.", response ? response.error : "No response");
+            displayAnalysis(anchorElement, `Error: Could not set active prompt. ${response ? response.error : ''}`, true);
+            removeExistingActionBar();
+          }
+        }
+      );
+    };
+    actionBar.appendChild(button);
+  }
+
+  document.body.appendChild(actionBar);
+  currentActionBar = actionBar; // Store reference to the new bar
+
+  // Positioning (simple version for now)
+  const anchorRect = anchorElement.getBoundingClientRect();
+  // Attempt to position above the anchor element.
+  // We need actionBar.offsetHeight, so append then calculate, or estimate.
+  // For this pass, estimate/use fixed offset as per plan.
+  let topPosition = window.scrollY + anchorRect.top - 35; // Assuming ~30px height + 5px margin
+  if (topPosition < window.scrollY) { // Avoid going off-screen at the top
+      topPosition = window.scrollY + anchorRect.bottom + 5; // Position below instead
+  }
+  actionBar.style.top = topPosition + 'px';
+  actionBar.style.left = (window.scrollX + anchorRect.left) + 'px';
+
+  // Ensure it's visible if it overflows horizontally
+  const barRect = actionBar.getBoundingClientRect();
+  if (barRect.right > window.innerWidth) {
+      actionBar.style.left = (window.innerWidth - barRect.width - 5) + 'px'; // Adjust left to keep it in view
+  }
+   if (barRect.left < 0) {
+      actionBar.style.left = '5px';
+  }
+
+}
+
+function getWordUnderCursor(event) {
+  const clientX = event.clientX;
+  const clientY = event.clientY;
+
+  try {
+    const range = document.caretRangeFromPoint(clientX, clientY);
+    if (!range) {
+      // console.log("caretRangeFromPoint returned null");
+      return null;
+    }
+
+    if (range.startContainer.nodeType !== Node.TEXT_NODE || range.startContainer.textContent.trim() === '') {
+      // console.log("Not a text node or empty text node", range.startContainer);
+      return null;
+    }
+
+    let textNode = range.startContainer;
+    let offset = range.startOffset;
+    let text = textNode.textContent;
+
+    let startIndex = offset;
+    let endIndex = offset;
+
+    // Iterate backwards for startIndex
+    while (startIndex > 0) {
+      const char = text[startIndex - 1];
+      if (/\s|[.,;:!?()[\]{}"']/.test(char)) { // Word boundary characters
+        break;
+      }
+      startIndex--;
+    }
+
+    // Iterate forwards for endIndex
+    while (endIndex < text.length) {
+      const char = text[endIndex];
+      if (/\s|[.,;:!?()[\]{}"']/.test(char)) { // Word boundary characters
+        break;
+      }
+      endIndex++;
+    }
+
+    let word = text.substring(startIndex, endIndex);
+
+    if (!word || word.trim() === '') {
+        // console.log("Extracted word is empty");
+        return null;
+    }
+
+    return { word: word, anchorElement: textNode.parentElement || lastHoveredElement };
+
+  } catch (e) {
+    console.error("Error in getWordUnderCursor:", e);
+    return null;
+  }
+}
+
+
 document.addEventListener('keydown', (event) => {
   if (event.altKey && event.key === 'a') {
     event.preventDefault(); // Prevent any default browser action for 'alt+a'
+    removeExistingActionBar(); // Remove action bar if Alt+A is used
 
     if (lastHoveredElement) {
       const textContent = lastHoveredElement.textContent?.trim();
@@ -48,8 +211,52 @@ document.addEventListener('keydown', (event) => {
     } else {
       // console.log("Hotkey pressed, but no element was hovered."); // Optional: original console log
     }
+  } else if (event.altKey && event.key === 'z') {
+    event.preventDefault();
+    let identifiedWordText = null;
+    let anchorElementForBar = null;
+
+    const wordInfo = getWordUnderCursor(event);
+
+    if (wordInfo && wordInfo.word) {
+      identifiedWordText = wordInfo.word;
+      anchorElementForBar = wordInfo.anchorElement;
+      console.log("Alt+Z (caret). Word:", identifiedWordText, "Anchor:", anchorElementForBar);
+    } else {
+      // Fallback to lastHoveredElement
+      if (lastHoveredElement) {
+        identifiedWordText = lastHoveredElement.textContent?.trim();
+        anchorElementForBar = lastHoveredElement;
+        console.log("Alt+Z (fallback). Text:", identifiedWordText, "Anchor:", anchorElementForBar);
+      }
+    }
+
+    if (identifiedWordText && anchorElementForBar) {
+      showActionBar(anchorElementForBar, identifiedWordText);
+    } else {
+      console.log("Alt+Z pressed, but no text content or anchor element could be determined.");
+      removeExistingActionBar();
+    }
   }
 });
+
+
+// Add a click listener to the document to remove the action bar if clicking outside
+document.addEventListener('click', (event) => {
+  if (currentActionBar && !currentActionBar.contains(event.target)) {
+    // Check if the click was on an element that might trigger the bar (e.g. lastHoveredElement)
+    // This is tricky because the click might be on a new element.
+    // For now, any click outside an existing action bar will remove it.
+    // We also need to ensure that clicking a button *inside* the action bar doesn't immediately remove it
+    // before its own click handler can run. The `!currentActionBar.contains(event.target)` handles this.
+
+    // If Alt+Z was just pressed to show the bar, lastHoveredElement would be event.target.
+    // This simple check might not be perfect but is a start.
+    if (lastHoveredElement !== event.target) {
+         removeExistingActionBar();
+    }
+  }
+}, true); // Use capture phase to potentially intercept clicks that might otherwise be handled by other listeners.
 
 function displayAnalysis(originalElement, analysisText, isError) {
   if (!originalElement || !document.body.contains(originalElement)) {

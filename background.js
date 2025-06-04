@@ -5,7 +5,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const textToAnalyze = request.text;
 
     chrome.storage.local.get(
-      ['apiEndpoint', 'apiKey', 'modelPresets', 'selectedModelPresetIndex', 'customPromptTemplate', 'enableFiltering', 'filterStartSymbol', 'filterEndSymbol'],
+      ['apiEndpoint', 'apiKey', 'modelPresets', 'selectedModelPresetIndex', 'customLLMPrompts', 'selectedCustomPromptIndex', 'enableFiltering', 'filterStartSymbol', 'filterEndSymbol'],
       (config) => {
       if (!config.apiEndpoint || !config.apiKey) {
         console.error('API endpoint or key not configured.');
@@ -25,15 +25,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.warn(`Text Analyzer: Model preset not properly configured or selected. Defaulting to ${modelForAnalysis}. Presets: ${JSON.stringify(config.modelPresets)}, Index: ${config.selectedModelPresetIndex}`);
       }
 
-      let chosenPromptTemplate = DEFAULT_PROMPT_TEMPLATE_BG; // Default to the background's default
-      if (config.customPromptTemplate && typeof config.customPromptTemplate === 'string' && config.customPromptTemplate.includes("{{TEXT_TO_ANALYZE}}")) {
-        chosenPromptTemplate = config.customPromptTemplate;
-      } else if (config.customPromptTemplate) {
-        // This case means a custom prompt exists but is invalid (missing placeholder)
-        // Log an error/warning and use default. Or, popup.js should ideally prevent saving invalid ones.
-        console.warn("Text Analyzer: Invalid custom prompt found in storage (missing placeholder). Using default prompt.");
+      let chosenPromptTemplate = DEFAULT_PROMPT_TEMPLATE_BG;
+      let updateStorageWithDefaults = false;
+
+      if (config.customLLMPrompts && Array.isArray(config.customLLMPrompts) && config.customLLMPrompts.length === 6 &&
+          typeof config.selectedCustomPromptIndex === 'number' &&
+          config.selectedCustomPromptIndex >= 0 && config.selectedCustomPromptIndex < 6) {
+
+          const selectedPrompt = config.customLLMPrompts[config.selectedCustomPromptIndex];
+          if (selectedPrompt && typeof selectedPrompt === 'string' && selectedPrompt.includes("{{TEXT_TO_ANALYZE}}")) {
+              chosenPromptTemplate = selectedPrompt;
+          } else {
+              console.warn("Text Analyzer: Selected custom prompt is invalid or missing placeholder. Using default prompt.");
+              // If the selected prompt is bad, but the structure exists, we still use default.
+              // We might not want to overwrite the entire array if just one selected prompt is bad.
+              // However, for robust initialization, if the structure is present but content bad,
+              // it might indicate a corrupted state.
+              // For now, just use default, don't trigger full reset if structure is OK.
+          }
+      } else {
+          // Data structure is missing or invalid, use default and plan to save defaults.
+          console.warn("Text Analyzer: Custom prompts data not found or invalid in storage. Using default prompt and initializing storage.");
+          updateStorageWithDefaults = true;
       }
-      // If config.customPromptTemplate is null/undefined, chosenPromptTemplate remains DEFAULT_PROMPT_TEMPLATE_BG
+
+      if (updateStorageWithDefaults) {
+          const defaultPrompts = Array(6).fill(DEFAULT_PROMPT_TEMPLATE_BG);
+          chrome.storage.local.set({
+              customLLMPrompts: defaultPrompts,
+              selectedCustomPromptIndex: 0
+          }, () => {
+              console.log("Text Analyzer: Initialized custom prompts in storage with defaults.");
+          });
+          // chosenPromptTemplate is already DEFAULT_PROMPT_TEMPLATE_BG in this case.
+      }
 
       const finalPrompt = chosenPromptTemplate.replace("{{TEXT_TO_ANALYZE}}", textToAnalyze);
 
@@ -177,6 +202,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
 
     return true; // Crucial for async testApiConfig
+  } else if (request.action === "setActivePromptIndex") {
+    const newIndex = request.index;
+
+    if (typeof newIndex === 'number' && newIndex >= 0 && newIndex <= 5) {
+      chrome.storage.local.set({ selectedCustomPromptIndex: newIndex }, () => {
+        if (chrome.runtime.lastError) {
+          console.error("Error saving selectedCustomPromptIndex:", chrome.runtime.lastError);
+          sendResponse({ success: false, error: "Failed to save prompt selection." });
+        } else {
+          // console.log("Active prompt index successfully updated to:", newIndex); // Optional: for debugging
+          sendResponse({ success: true });
+        }
+      });
+    } else {
+      console.error("Invalid prompt index received:", newIndex);
+      sendResponse({ success: false, error: "Invalid prompt index provided." });
+    }
+    return true; // Indicate asynchronous response
   }
   // If you have more actions, add more else if blocks.
   // Optional: return false if no async operation is pending for a specific message type.
