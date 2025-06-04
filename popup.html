@@ -16,6 +16,7 @@
   <div id="navControls" style="padding-bottom: 10px; border-bottom: 1px solid #ccc; margin-bottom: 10px;">
     <button id="showSettingsView">Settings</button>
     <button id="showModelPresetsView">Model Presets</button>
+    <button id="showCustomPromptsViewButton">Custom Prompts</button>
   </div>
 
   <div id="settingsView">
@@ -34,23 +35,24 @@
 
   <div id="modelPresetSelectionControls" style="margin-top: 5px; margin-bottom: 10px;">
     <label style="margin-bottom: 3px;">Choose a Preset:</label>
-    <button id="selectModelPreset1" data-preset-index="0">P1</button>
-    <button id="selectModelPreset2" data-preset-index="1">P2</button>
-    <button id="selectModelPreset3" data-preset-index="2">P3</button>
-    <button id="selectModelPreset4" data-preset-index="3">P4</button>
-    <button id="selectModelPreset5" data-preset-index="4">P5</button>
+    <button id="selectModelPreset1" data-preset-index="0" style="min-width: 30px; padding: 5px 0;">P1</button>
+    <button id="selectModelPreset2" data-preset-index="1" style="min-width: 30px; padding: 5px 0;">P2</button>
+    <button id="selectModelPreset3" data-preset-index="2" style="min-width: 30px; padding: 5px 0;">P3</button>
+    <button id="selectModelPreset4" data-preset-index="3" style="min-width: 30px; padding: 5px 0;">P4</button>
+    <button id="selectModelPreset5" data-preset-index="4" style="min-width: 30px; padding: 5px 0;">P5</button>
   </div>
 
-  <div id="customPromptSection" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
-    <label for="customPromptTemplate" style="font-weight: bold;">Custom Prompt Template:</label>
-    <p style="font-size: 0.85em; color: #444; margin-top: 2px; margin-bottom: 5px;">Use <code>{{TEXT_TO_ANALYZE}}</code> as the placeholder for the selected text from the webpage.</p>
-    <textarea id="customPromptTemplate" rows="8" style="width: 95%; margin-top: 3px; font-family: monospace; font-size: 0.9em;"></textarea>
-
-    <div style="margin-top: 5px;">
-      <button id="savePromptButton">Save Prompt</button>
-      <button id="resetPromptButton">Reset to Default</button>
+  <div id="selectActivePromptSection" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+    <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 1em;">Select Active Custom Prompt</h3>
+    <div id="customPromptSelectionControls">
+      <button id="selectCustomPromptButton1" data-prompt-index="0" style="min-width: 30px; padding: 5px 0;">1</button>
+      <button id="selectCustomPromptButton2" data-prompt-index="1" style="min-width: 30px; padding: 5px 0;">2</button>
+      <button id="selectCustomPromptButton3" data-prompt-index="2" style="min-width: 30px; padding: 5px 0;">3</button>
+      <button id="selectCustomPromptButton4" data-prompt-index="3" style="min-width: 30px; padding: 5px 0;">4</button>
+      <button id="selectCustomPromptButton5" data-prompt-index="4" style="min-width: 30px; padding: 5px 0;">5</button>
+      <button id="selectCustomPromptButton6" data-prompt-index="5" style="min-width: 30px; padding: 5px 0;">6</button>
     </div>
-    <div id="promptStatus" style="margin-top: 5px; font-size: 0.9em;"></div>
+    <div id="activePromptStatus" style="margin-top: 5px; font-size: 0.9em;"></div>
   </div>
 
   <div id="responseProcessingSection" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
@@ -98,6 +100,24 @@
 
     <button id="saveModelPresets" style="margin-top: 15px;">Save Model Presets</button>
     <div id="modelPresetsStatus" style="margin-top: 10px; font-size: 0.9em;"></div>
+  </div>
+
+  <div id="customPromptsView" style="display: none;">
+    <h2>Define 6 Custom LLM Prompts</h2>
+    <label for="customPromptInput1">Prompt 1:</label>
+    <textarea id="customPromptInput1" rows="6" style="width: 95%; margin-top: 3px; font-family: monospace; font-size: 0.9em;"></textarea>
+    <label for="customPromptInput2">Prompt 2:</label>
+    <textarea id="customPromptInput2" rows="6" style="width: 95%; margin-top: 3px; font-family: monospace; font-size: 0.9em;"></textarea>
+    <label for="customPromptInput3">Prompt 3:</label>
+    <textarea id="customPromptInput3" rows="6" style="width: 95%; margin-top: 3px; font-family: monospace; font-size: 0.9em;"></textarea>
+    <label for="customPromptInput4">Prompt 4:</label>
+    <textarea id="customPromptInput4" rows="6" style="width: 95%; margin-top: 3px; font-family: monospace; font-size: 0.9em;"></textarea>
+    <label for="customPromptInput5">Prompt 5:</label>
+    <textarea id="customPromptInput5" rows="6" style="width: 95%; margin-top: 3px; font-family: monospace; font-size: 0.9em;"></textarea>
+    <label for="customPromptInput6">Prompt 6:</label>
+    <textarea id="customPromptInput6" rows="6" style="width: 95%; margin-top: 3px; font-family: monospace; font-size: 0.9em;"></textarea>
+    <button id="saveCustomPromptsButton">Save Custom Prompts</button>
+    <div id="customPromptsStatus" style="margin-top: 10px; font-size: 0.9em;"></div>
   </div>
 
   <script src="popup.js"></script>
