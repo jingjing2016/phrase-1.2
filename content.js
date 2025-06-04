@@ -16,7 +16,7 @@ function removeExistingActionBar() {
   }
 }
 
-function showActionBar(anchorElement, identifiedWordText) {
+function showActionBar(anchorElement, identifiedWordText, clientX, clientY) {
   removeExistingActionBar(); // Remove any existing bar first
 
   const actionBar = document.createElement('div');
@@ -89,19 +89,13 @@ function showActionBar(anchorElement, identifiedWordText) {
   document.body.appendChild(actionBar);
   currentActionBar = actionBar; // Store reference to the new bar
 
-  // Positioning (simple version for now)
-  const anchorRect = anchorElement.getBoundingClientRect();
-  // Attempt to position above the anchor element.
-  // We need actionBar.offsetHeight, so append then calculate, or estimate.
-  // For this pass, estimate/use fixed offset as per plan.
-  let topPosition = window.scrollY + anchorRect.top - 35; // Assuming ~30px height + 5px margin
-  if (topPosition < window.scrollY) { // Avoid going off-screen at the top
-      topPosition = window.scrollY + anchorRect.bottom + 5; // Position below instead
-  }
+  // Positioning based on mouse cursor
+  let topPosition = window.scrollY + clientY - actionBar.offsetHeight - 5; // Subtract height and a small margin
   actionBar.style.top = topPosition + 'px';
-  actionBar.style.left = (window.scrollX + anchorRect.left) + 'px';
+  actionBar.style.left = (window.scrollX + clientX) + 'px';
 
   // Ensure it's visible if it overflows horizontally
+  // This check should happen after initial positioning.
   const barRect = actionBar.getBoundingClientRect();
   if (barRect.right > window.innerWidth) {
       actionBar.style.left = (window.innerWidth - barRect.width - 5) + 'px'; // Adjust left to keep it in view
@@ -215,6 +209,8 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     let identifiedWordText = null;
     let anchorElementForBar = null;
+    const cursorX = event.clientX;
+    const cursorY = event.clientY;
 
     const wordInfo = getWordUnderCursor(event);
 
@@ -232,7 +228,7 @@ document.addEventListener('keydown', (event) => {
     }
 
     if (identifiedWordText && anchorElementForBar) {
-      showActionBar(anchorElementForBar, identifiedWordText);
+      showActionBar(anchorElementForBar, identifiedWordText, cursorX, cursorY);
     } else {
       console.log("Alt+Z pressed, but no text content or anchor element could be determined.");
       removeExistingActionBar();
@@ -251,10 +247,9 @@ document.addEventListener('click', (event) => {
     // before its own click handler can run. The `!currentActionBar.contains(event.target)` handles this.
 
     // If Alt+Z was just pressed to show the bar, lastHoveredElement would be event.target.
-    // This simple check might not be perfect but is a start.
-    if (lastHoveredElement !== event.target) {
-         removeExistingActionBar();
-    }
+    // The condition `!currentActionBar.contains(event.target)` is the primary check
+    // for closing the bar. If the click is outside, we should close it.
+    removeExistingActionBar();
   }
 }, true); // Use capture phase to potentially intercept clicks that might otherwise be handled by other listeners.
 
